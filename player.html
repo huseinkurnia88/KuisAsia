@@ -76,27 +76,30 @@ input{width:100%;border:0;border-radius:16px;padding:16px;font:700 20px Poppins,
 </style></head><body>
 <div id="app"><div id="bar" class="hide"><span id="nm"></span><span id="pt">⭐ 0</span></div><div id="v"><div class="big spin">⏳</div></div></div>
 <script>
-var me=null,S=null,cur='',sel={},nx=null;
+var me=null,S=null,cur='',sel={},nx=null,seq=0,joining=false;
 try{me=JSON.parse(localStorage.getItem('kq')||'null')}catch(e){}
 function jit(a,b){return a+Math.random()*(b-a)}
 function R(k,h){if(cur===k)return false;cur=k;$('v').innerHTML=h;return true}
-function sync(){clearTimeout(nx);call('playerSync',[me&&me.id,me&&me.g],function(d){S=d;if(d.stale&&me){me=null}after()},function(){nx=setTimeout(sync,jit(1500,3000))})}
+function sync(){clearTimeout(nx);var q=++seq;call('playerSync',[me&&me.id,me&&me.g],function(d){if(q!==seq)return;S=d;if(d.stale&&me){me=null}after()},function(){if(q===seq)nx=setTimeout(sync,jit(1500,3000))})}
 function after(){tick();var w;
   if(S.stale||S.status!=='running')w=jit(2200,3500);
   else{var t=now(),ev=[];S.sched.forEach(function(x,i){ev.push(x[1]);if(i===S.sched.length-1)ev.push(x[2])});ev=ev.filter(function(e){return e>t});if(!ev.length)return;w=Math.min(8000,ev[0]-t+jit(300,1600))}
   nx=setTimeout(sync,w)}
 sync();setInterval(tick,100);
-function join(){var n=$('in').value.trim();if(n.length<2){$('jm').textContent='Nama minimal 2 huruf ya';return}
-  call('playerJoin',[n],function(r){if(!r.ok){$('jm').textContent=r.msg;return}me={id:r.id,g:r.gid,name:r.name};try{localStorage.setItem('kq',JSON.stringify(me));localStorage.setItem('kqn',r.name)}catch(e){}sync()},function(){$('jm').textContent='Koneksi bermasalah, coba lagi'})}
+function join(){if(joining)return;var n=$('in').value.trim();if(n.length<2){$('jm').textContent='Nama minimal 2 huruf ya';return}
+  joining=true;var b=$('jb');b.disabled=true;b.textContent='Masuk…';
+  var fail=function(m){joining=false;b.disabled=false;b.textContent='Gas Masuk! 🚀';$('jm').textContent=m};
+  call('playerJoin',[n],function(r){if(!r.ok){fail(r.msg);return}joining=false;me={id:r.id,g:r.gid,name:r.name};try{localStorage.setItem('kq',JSON.stringify(me));localStorage.setItem('kqn',r.name)}catch(e){}
+    seq++;clearTimeout(nx);S={stale:false,status:'lobby',name:r.name,n:1,title:S&&S.title};tick();sync()},function(){fail('Koneksi bermasalah, coba lagi')})}
 function tick(){
   if(!S)return;var t=now();
   if(S.stale){$('bar').classList.add('hide');
     if(S.status==='lobby'){var pre='';try{pre=localStorage.getItem('kqn')||''}catch(e){}
-      R('join','<div class="big bn">🎓</div><h1>'+esc(S.title)+'</h1><p>Isi nama panggilanmu dulu ya</p><input id="in" maxlength="18" placeholder="Nama kamu" autocomplete="off" value="'+esc(pre)+'"><button class="go" onclick="join()">Gas Masuk! 🚀</button><div class="msg" id="jm"></div>')}
+      R('join','<div class="big bn">🎓</div><h1>'+esc(S.title)+'</h1><p>Isi nama panggilanmu dulu ya</p><input id="in" maxlength="18" placeholder="Nama kamu" autocomplete="off" onkeydown="if(event.key===\'Enter\')join()" value="'+esc(pre)+'"><button class="go" id="jb" onclick="join()">Gas Masuk! 🚀</button><div class="msg" id="jm"></div>')}
     else R('block','<div class="big">⏳</div><h2>Kuis sedang berlangsung</h2><p>Pendaftaran sudah ditutup. Tunggu sesi berikutnya ya!</p>');
     return}
   $('bar').classList.remove('hide');$('nm').textContent='👤 '+S.name;
-  if(S.status!=='running'){R('wait'+S.n,'<div class="big bn">🙌</div><h2>Kamu sudah masuk!</h2><p>Menunggu layar utama memulai kuis…</p><div class="dots"><span>●</span><span>●</span><span>●</span></div><p>👥 '+S.n+' peserta</p>');return}
+  if(S.status!=='running'){if(R('wait','<div class="big bn">🎉</div><h2>Selamat, kamu berhasil login!</h2><p>Tunggu kuis dimulai sebentar lagi…</p><div class="dots"><span>●</span><span>●</span><span>●</span></div><p>👥 <b id="wn"></b> peserta sudah masuk</p>')){confetti(50,innerWidth/2,innerHeight*.35,14)}$('wn').textContent=S.n;return}
   var s=S.sched;
   if(t<s[0][0]){var n=Math.ceil((s[0][0]-t)/1000);R('count','<h2>Siap-siap!</h2><div class="big bn" id="cdn"></div><p>Soal pertama sebentar lagi</p>');$('cdn').textContent=n>3?'🔥':n;return}
   for(var i=0;i<s.length;i++){if(t<s[i][1]){question(i,t);return}if(t<s[i][2]){reveal(i);return}}
